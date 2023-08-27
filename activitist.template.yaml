@@ -1,0 +1,6 @@
+line:
+  channelSecret: "Line message api channel secret"
+  channelToken: "Line message api channel token"
+
+gptApi:
+  key: "openai gpt api key"
