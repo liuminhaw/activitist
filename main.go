@@ -59,7 +59,7 @@ func main() {
 			log.WithFields(log.Fields{
 				"method": "POST",
 				"path":   "/line/message",
-			}).Errorf("new linebot: %w", err)
+			}).Errorf("new linebot: %s", err)
 			http.Error(w, "Something went wrong", http.StatusInternalServerError)
 		}
 		events, err := bot.ParseRequest(r)
@@ -67,7 +67,7 @@ func main() {
 			log.WithFields(log.Fields{
 				"method": "POST",
 				"path":   "/line/message",
-			}).Errorf("parse request: %w", err)
+			}).Errorf("parse request: %s", err)
 			http.Error(w, "Something went wrong", http.StatusInternalServerError)
 		}
 
