@@ -93,13 +93,13 @@ func (as *AssistantService) AnalyzeMessage() (string, error) {
 					Content: as.Message,
 				},
 			},
-			// Functions:    []openai.FunctionDefinition{schema},
-			// FunctionCall: &openai.FunctionCall{Name: "get_action", Arguments: ""},
+			Functions:    []openai.FunctionDefinition{schema},
+			FunctionCall: &openai.FunctionCall{Name: "get_action", Arguments: ""},
 		},
 	)
 	if err != nil {
 		return "", fmt.Errorf("analyze message: %w", err)
 	}
-	// return resp.Choices[0].Message.FunctionCall.Arguments, nil
-	return resp.Choices[0].Message.Content, nil
+	return resp.Choices[0].Message.FunctionCall.Arguments, nil
+	// return resp.Choices[0].Message.Content, nil
 }
