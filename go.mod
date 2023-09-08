@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/go-chi/chi/v5 v5.0.10
-	github.com/line/line-bot-sdk-go/v7 v7.20.0
+	github.com/line/line-bot-sdk-go v7.8.0+incompatible
 	github.com/sashabaranov/go-openai v1.14.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.16.0

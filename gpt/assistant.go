@@ -14,7 +14,7 @@ const systemRole = `You are an professional traditional chinese activity assista
 - starttime (in the format of YYYY-mm-dd HH:MM:SS)
 - endtime (in the format of YYYY-mm-dd HH:MM:SS)
 - location
-Items other than action and name can be omitted if there is no information.Based on the provided information, please determine whether this is intended for adding an event, updating an event, deleting an event, listing events, or if it's indeterminate. Fill in the action field with "create", "update", "delete", "list", or "undefined" accordingly.
+Action key is mandatory. Based on the provided information, please determine whether this is intended for adding an event, updating an event, deleting an event, listing events, or if it's indeterminate. Fill in the action field with "create", "update", "delete", "list", or "undefined" accordingly.
 For the name field, provide a distinctive event name that is not easily confused with other events in traditional Chinese.
 For the starttime field, provide the event's starting time.
 For the endtime field, provide the event's ending time, leaving it empty if no specific information is available.
@@ -59,26 +59,28 @@ var schema openai.FunctionDefinition = openai.FunctionDefinition{
 	},
 }
 
-type AssistantConfig struct {
-	Key string
-}
+// type AssistantConfig struct {
+// 	Key string
+// }
 
-type AssistantService struct {
-	Message       string
-	assistantConf *AssistantConfig
-}
+// type AssistantService struct {
+// 	Message       string
+// 	assistantConf *AssistantConfig
+// }
 
-func NewAssistantService(config *AssistantConfig, msg string) *AssistantService {
-	as := AssistantService{
-		Message:       msg,
-		assistantConf: config,
-	}
+// func NewAssistantService(config *AssistantConfig, msg string) *AssistantService {
+// 	as := AssistantService{
+// 		Message:       msg,
+// 		assistantConf: config,
+// 	}
 
-	return &as
-}
+// 	return &as
+// }
 
-func (as *AssistantService) AnalyzeMessage() (string, error) {
-	client := openai.NewClient(as.assistantConf.Key)
+// func (as *AssistantService) AnalyzeMessage() (string, error) {
+func AnalyzeMessage(message string, key string) (string, error) {
+	// client := openai.NewClient(as.assistantConf.Key)
+	client := openai.NewClient(key)
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
@@ -90,7 +92,7 @@ func (as *AssistantService) AnalyzeMessage() (string, error) {
 				},
 				{
 					Role:    openai.ChatMessageRoleUser,
-					Content: as.Message,
+					Content: message,
 				},
 			},
 			Functions:    []openai.FunctionDefinition{schema},

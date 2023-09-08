@@ -3,16 +3,13 @@ package main
 import (
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/line/line-bot-sdk-go/v7/linebot"
+	"github.com/liuminhaw/activitist/messages"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	"github.com/liuminhaw/activitist/gpt"
 )
 
 func init() {
@@ -39,8 +36,19 @@ func main() {
 
 	channelSecret := viper.GetString("line.channelSecret")
 	channelToken := viper.GetString("line.channelToken")
+	gptApiKey := viper.GetString("gptApi.key")
 	// log.Debugf("Line channel secret: %s", channelSecret)
 	// log.Debugf("Line channel token: %s", channelToken)
+
+	activityC := messages.Message{
+		Line: messages.LineAuth{
+			ChannelSecret: channelSecret,
+			ChannelToken:  channelToken,
+		},
+		GptApi: messages.GptApiAuth{
+			Key: gptApiKey,
+		},
+	}
 
 	r := chi.NewRouter()
 
@@ -53,52 +61,6 @@ func main() {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Welcome to activitist!!!"))
 	})
-	r.Post("/line/message", func(w http.ResponseWriter, r *http.Request) {
-		bot, err := linebot.New(channelSecret, channelToken)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"method": "POST",
-				"path":   "/line/message",
-			}).Errorf("new linebot: %s", err)
-			http.Error(w, "Something went wrong", http.StatusInternalServerError)
-		}
-		events, err := bot.ParseRequest(r)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"method": "POST",
-				"path":   "/line/message",
-			}).Errorf("parse request: %s", err)
-			http.Error(w, "Something went wrong", http.StatusInternalServerError)
-		}
-
-		for _, event := range events {
-			if event.Type == linebot.EventTypeMessage {
-				switch message := event.Message.(type) {
-				case *linebot.TextMessage:
-					log.WithFields(log.Fields{
-						"method": "POST",
-						"path":   "/line/message",
-						"event":  "textMessage",
-					}).Info(message.Text)
-					if ok := strings.HasPrefix(message.Text, "@act"); ok {
-						prompt := strings.ReplaceAll(message.Text, "@act", "")
-						gptService := gpt.NewAssistantService(&gpt.AssistantConfig{
-							Key: viper.GetString("gptApi.key"),
-						}, prompt)
-						replyMessage, err := gptService.AnalyzeMessage()
-						if err != nil {
-							log.WithFields(log.Fields{
-								"method": "POST",
-								"path":   "/line/message",
-								"event":  "textMessage",
-							}).Error(err)
-							return
-						}
-						bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do()
-					}
-				}
-			}
-		}
-	})
+	r.Post("/line/message", activityC.Receive)
 	http.ListenAndServe(":3000", r)
 }
