@@ -17,7 +17,7 @@ const systemRole = `You are an professional traditional chinese activity assista
 Action key is mandatory. Based on the provided information, please determine whether this is intended for adding an event, updating an event, deleting an event, listing events, or if it's indeterminate. Fill in the action field with "create", "update", "delete", "list", or "undefined" accordingly.
 For the name field, provide a distinctive event name that is not easily confused with other events in traditional Chinese.
 For the starttime field, provide the event's starting time.
-For the endtime field, provide the event's ending time, leaving it empty if no specific information is available.
+For the endtime field, provide the event's ending time, leaving it empty if no specific information is available, do not set any default endtime.
 For the location field, provide the event's location.
 Except for action key, which are mandatory, the other fields should not be included if there is no available information to determine their content.
 For example, if the message is "Add location to the Thin Eatery event: Thin Eatery," it should be interpreted as "Modify the location of the Thin Eatery event to Thin Eatery."
@@ -59,23 +59,9 @@ var schema openai.FunctionDefinition = openai.FunctionDefinition{
 	},
 }
 
-// type AssistantConfig struct {
-// 	Key string
-// }
-
-// type AssistantService struct {
-// 	Message       string
-// 	assistantConf *AssistantConfig
-// }
-
-// func NewAssistantService(config *AssistantConfig, msg string) *AssistantService {
-// 	as := AssistantService{
-// 		Message:       msg,
-// 		assistantConf: config,
-// 	}
-
-// 	return &as
-// }
+type GptAuth struct {
+	ApiKey string
+}
 
 // func (as *AssistantService) AnalyzeMessage() (string, error) {
 func AnalyzeMessage(message string, key string) (string, error) {

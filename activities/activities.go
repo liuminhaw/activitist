@@ -2,11 +2,17 @@ package activities
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 
 	"github.com/liuminhaw/activitist/gpt"
 )
+
+type ActivityService struct {
+	Activity Activity
+	DB       *sql.DB
+}
 
 type Activity struct {
 	Action    string `json:"action"`
@@ -16,7 +22,7 @@ type Activity struct {
 	Location  string `json:"location"`
 }
 
-func Prompt(message string, key string) (string, error) {
+func (service ActivityService) Prompt(message string, key string) (string, error) {
 	replyMessage, err := gpt.AnalyzeMessage(message, key)
 	if err != nil {
 		return "", fmt.Errorf("analyze message: %w", err)
@@ -28,9 +34,14 @@ func Prompt(message string, key string) (string, error) {
 		return "", fmt.Errorf("unmarshal activity: %w", err)
 	}
 
+	service.Activity = activity
+
 	switch activity.Action {
 	case "create":
-		replyMessage = activity.create()
+		replyMessage, err = service.create()
+		if err != nil {
+			return "", fmt.Errorf("activity prompt: %w", err)
+		}
 	case "update":
 		replyMessage = activity.update()
 	case "list":
@@ -44,17 +55,28 @@ func Prompt(message string, key string) (string, error) {
 	return replyMessage, nil
 }
 
-func (a Activity) create() string {
+func (service ActivityService) create() (string, error) {
 	var b bytes.Buffer
+	var id int
 
-	b.WriteString(fmt.Sprintf("建立活動: %s\n", a.Name))
-	b.WriteString(fmt.Sprintf("時間: %s\n", a.StartTime))
-	if a.EndTime != "" {
-		b.WriteString(fmt.Sprintf("結束時間: %s\n", a.EndTime))
+	// Insert into database
+	row := service.DB.QueryRow(`
+		INSERT INTO individual_activities (activity, location, user_id) 
+		VALUES ($1, $2, $3) RETURNING id
+	`, service.Activity.Name, service.Activity.Location, 1)
+	err := row.Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("create activity: %w", err)
 	}
-	b.WriteString(fmt.Sprintf("地點: %s", a.Location))
 
-	return b.String()
+	b.WriteString(fmt.Sprintf("建立活動: %s\n", service.Activity.Name))
+	b.WriteString(fmt.Sprintf("時間: %s\n", service.Activity.StartTime))
+	if service.Activity.EndTime != "" {
+		b.WriteString(fmt.Sprintf("結束時間: %s\n", service.Activity.EndTime))
+	}
+	b.WriteString(fmt.Sprintf("地點: %s", service.Activity.Location))
+
+	return b.String(), nil
 }
 
 func (a Activity) update() string {

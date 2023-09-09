@@ -1,16 +1,26 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/liuminhaw/activitist/activities"
+	"github.com/liuminhaw/activitist/gpt"
 	"github.com/liuminhaw/activitist/messages"
+	"github.com/liuminhaw/activitist/models"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
+
+type config struct {
+	PSQL    models.PostgresConfig
+	Linebot messages.LineAuth
+	Gpt     gpt.GptAuth
+}
 
 func init() {
 	// Log as JSON instead of the default ASCII formatter.
@@ -24,29 +34,51 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
-func main() {
+func loadConfig() (config, error) {
+	var cfg config
+
 	viper.SetConfigName("activitist")         // name of config file (without extension)
 	viper.SetConfigType("yaml")               // REQUIRED if the config file does not have the extension in the name
 	viper.AddConfigPath("/etc/activitist.d/") // path to look for the config file in
 	viper.AddConfigPath(".")                  // optionally look for config in the working directory
 	err := viper.ReadInConfig()               // Find and read the config file
 	if err != nil {                           // Handle errors reading the config file
-		log.WithFields(log.Fields{"event": "readConfig"}).Fatal(err)
+		return cfg, fmt.Errorf("read config: %w", err)
 	}
 
-	channelSecret := viper.GetString("line.channelSecret")
-	channelToken := viper.GetString("line.channelToken")
-	gptApiKey := viper.GetString("gptApi.key")
-	// log.Debugf("Line channel secret: %s", channelSecret)
-	// log.Debugf("Line channel token: %s", channelToken)
+	cfg.PSQL.Host = viper.GetString("db.host")
+	cfg.PSQL.Port = viper.GetString("db.port")
+	cfg.PSQL.User = viper.GetString("db.user")
+	cfg.PSQL.Password = viper.GetString("db.password")
+	cfg.PSQL.Database = viper.GetString("db.database")
+	cfg.PSQL.SSLMode = viper.GetString("db.sslMode")
 
-	activityC := messages.Message{
-		Line: messages.LineAuth{
-			ChannelSecret: channelSecret,
-			ChannelToken:  channelToken,
-		},
-		GptApi: messages.GptApiAuth{
-			Key: gptApiKey,
+	cfg.Linebot.ChannelSecret = viper.GetString("line.channelSecret")
+	cfg.Linebot.ChannelToken = viper.GetString("line.channelToken")
+	cfg.Gpt.ApiKey = viper.GetString("gptApi.key")
+
+	return cfg, nil
+}
+
+func main() {
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Panic(err)
+	}
+
+	// Setup the database
+	db, err := models.Open(cfg.PSQL)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	// Setup service
+	lineS := messages.LineService{
+		Line: cfg.Linebot,
+		Gpt:  cfg.Gpt,
+		ActivityService: activities.ActivityService{
+			DB: db,
 		},
 	}
 
@@ -61,6 +93,6 @@ func main() {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Welcome to activitist!!!"))
 	})
-	r.Post("/line/message", activityC.Receive)
+	r.Post("/line/message", lineS.Receive)
 	http.ListenAndServe(":3000", r)
 }

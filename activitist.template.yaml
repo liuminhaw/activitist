@@ -4,3 +4,11 @@ line:
 
 gptApi:
   key: "openai gpt api key"
+
+db:
+  host: "Postgres DB host"
+  port: "Postgres DB connection port"
+  user: "Postgres DB username"
+  password: "Postgres DB password"
+  database: "Postgres DB name"
+  sslMode: "enable | disable"

@@ -6,12 +6,14 @@ import (
 
 	"github.com/line/line-bot-sdk-go/linebot"
 	"github.com/liuminhaw/activitist/activities"
+	"github.com/liuminhaw/activitist/gpt"
 	log "github.com/sirupsen/logrus"
 )
 
-type Message struct {
-	Line   LineAuth
-	GptApi GptApiAuth
+type LineService struct {
+	Line            LineAuth
+	Gpt             gpt.GptAuth
+	ActivityService activities.ActivityService
 }
 
 type LineAuth struct {
@@ -19,12 +21,8 @@ type LineAuth struct {
 	ChannelToken  string
 }
 
-type GptApiAuth struct {
-	Key string
-}
-
-func (m Message) Receive(w http.ResponseWriter, r *http.Request) {
-	bot, err := linebot.New(m.Line.ChannelSecret, m.Line.ChannelToken)
+func (ls LineService) Receive(w http.ResponseWriter, r *http.Request) {
+	bot, err := linebot.New(ls.Line.ChannelSecret, ls.Line.ChannelToken)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"method": "POST",
@@ -52,7 +50,7 @@ func (m Message) Receive(w http.ResponseWriter, r *http.Request) {
 				}).Info(message.Text)
 				if ok := strings.HasPrefix(message.Text, "@act"); ok {
 					prompt := strings.ReplaceAll(message.Text, "@act", "")
-					replyMessage, err := activities.Prompt(prompt, m.GptApi.Key)
+					replyMessage, err := ls.ActivityService.Prompt(prompt, ls.Gpt.ApiKey)
 					if err != nil {
 						log.WithFields(log.Fields{
 							"method": "POST",
