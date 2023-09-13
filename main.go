@@ -77,8 +77,13 @@ func main() {
 	lineS := messages.LineService{
 		Line: cfg.Linebot,
 		Gpt:  cfg.Gpt,
-		ActivityService: activities.ActivityService{
+		ActivityService: &activities.ActivityService{
 			DB: db,
+		},
+		RegisterService: &activities.RegisterService{
+			DB:            db,
+			BytesPerToken: 32,
+			Duration:      1 * time.Hour,
 		},
 	}
 

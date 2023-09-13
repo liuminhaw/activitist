@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -13,7 +14,8 @@ import (
 type LineService struct {
 	Line            LineAuth
 	Gpt             gpt.GptAuth
-	ActivityService activities.ActivityService
+	ActivityService *activities.ActivityService
+	RegisterService *activities.RegisterService
 }
 
 type LineAuth struct {
@@ -48,7 +50,47 @@ func (ls LineService) Receive(w http.ResponseWriter, r *http.Request) {
 					"path":   "/line/message",
 					"event":  "textMessage",
 				}).Info(message.Text)
-				if ok := strings.HasPrefix(message.Text, "@act"); ok {
+
+				var replyMessage string
+				switch {
+				case message.Text == "@whoami":
+					eventSource := event.Source
+					log.Info(fmt.Sprintf("%+v", *eventSource))
+					bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(fmt.Sprintf("User id: %s", eventSource.UserID))).Do()
+					return
+				case strings.HasPrefix(message.Text, "@register"):
+					token := strings.TrimSpace(strings.ReplaceAll(message.Text, "@register", ""))
+					if token == "" {
+						register, err := ls.RegisterService.TokenCreate(event.Source.UserID)
+						if err != nil {
+							log.WithFields(log.Fields{
+								"method": "POST",
+								"path":   "/line/message",
+								"event":  "textMessage",
+							}).Error(err)
+							return
+						}
+						log.WithFields(log.Fields{
+							"user":  register.UserID,
+							"token": register.Token,
+						}).Info("Token created")
+						replyMessage = "Please obtain and send generated token"
+					} else {
+						err := ls.RegisterService.Register(event.Source.UserID, token)
+						if err != nil {
+							log.WithFields(log.Fields{
+								"method": "POST",
+								"path":   "/line/message",
+								"event":  "textMessage",
+							}).Error(err)
+							replyMessage = "Failed to register"
+						} else {
+							replyMessage = "Register successful"
+						}
+					}
+					bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do()
+					return
+				case strings.HasPrefix(message.Text, "@act"):
 					prompt := strings.ReplaceAll(message.Text, "@act", "")
 					replyMessage, err := ls.ActivityService.Prompt(prompt, ls.Gpt.ApiKey)
 					if err != nil {
@@ -60,6 +102,7 @@ func (ls LineService) Receive(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 					bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do()
+					return
 				}
 			}
 		}

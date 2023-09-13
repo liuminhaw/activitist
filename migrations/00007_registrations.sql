@@ -1,13 +1,14 @@
 -- +goose Up
 -- +goose StatementBegin
-CREATE TABLE users (
+CREATE TABLE registrations (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    line_id VARCHAR(255) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE
+    token_hash TEXT NOT NULL UNIQUE,
+    expires TIMESTAMPTZ NOT NULL,
+    line_id VARCHAR(40) UNIQUE
 );
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-DROP TABLE users;
+DROP TABLE registrations;
 -- +goose StatementEnd
