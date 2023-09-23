@@ -11,7 +11,7 @@ CREATE TABLE group_activities (
         FOREIGN KEY (group_id) REFERENCES groups(id)
         ON DELETE CASCADE
 );
-)
+
 -- +goose StatementEnd
 
 -- +goose Down
