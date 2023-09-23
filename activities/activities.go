@@ -10,7 +10,7 @@ import (
 )
 
 type ActivityService struct {
-	Activity Activity
+	Activity *Activity
 	DB       *sql.DB
 }
 
@@ -22,49 +22,34 @@ type Activity struct {
 	Location  string `json:"location"`
 }
 
-func (service ActivityService) Prompt(message string, key string) (string, error) {
+func (service *ActivityService) Prompt(message string, key string) error {
 	replyMessage, err := gpt.AnalyzeMessage(message, key)
 	if err != nil {
-		return "", fmt.Errorf("analyze message: %w", err)
+		return fmt.Errorf("analyze message: %w", err)
 	}
+	fmt.Printf("Prompt reply message: %s\n", replyMessage)
 
 	var activity Activity
 	err = json.Unmarshal([]byte(replyMessage), &activity)
 	if err != nil {
-		return "", fmt.Errorf("unmarshal activity: %w", err)
+		return fmt.Errorf("unmarshal activity: %w", err)
 	}
 
-	service.Activity = activity
+	service.Activity = &activity
 
-	switch activity.Action {
-	case "create":
-		replyMessage, err = service.create()
-		if err != nil {
-			return "", fmt.Errorf("activity prompt: %w", err)
-		}
-	case "update":
-		replyMessage = activity.update()
-	case "list":
-		replyMessage = activity.list()
-	case "delete":
-		replyMessage = activity.delete()
-	default:
-		replyMessage = activity.undefined()
-	}
-
-	return replyMessage, nil
+	return nil
 }
 
-func (service ActivityService) create() (string, error) {
+func (service *ActivityService) Create(id int) (string, error) {
 	var b bytes.Buffer
-	var id int
+	var retID int
 
 	// Insert into database
 	row := service.DB.QueryRow(`
 		INSERT INTO individual_activities (activity, location, user_id) 
 		VALUES ($1, $2, $3) RETURNING id
-	`, service.Activity.Name, service.Activity.Location, 1)
-	err := row.Scan(&id)
+	`, service.Activity.Name, service.Activity.Location, id)
+	err := row.Scan(&retID)
 	if err != nil {
 		return "", fmt.Errorf("create activity: %w", err)
 	}

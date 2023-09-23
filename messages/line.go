@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,20 +13,26 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type LineService struct {
-	Line            LineAuth
+type Line struct {
+	LineService     *LineService
 	Gpt             gpt.GptAuth
 	ActivityService *activities.ActivityService
 	RegisterService *activities.RegisterService
 }
 
-type LineAuth struct {
+type LineService struct {
 	ChannelSecret string
 	ChannelToken  string
+	DB            *sql.DB
 }
 
-func (ls LineService) Receive(w http.ResponseWriter, r *http.Request) {
-	bot, err := linebot.New(ls.Line.ChannelSecret, ls.Line.ChannelToken)
+type User struct {
+	ID     int
+	LineID string
+}
+
+func (l Line) Receive(w http.ResponseWriter, r *http.Request) {
+	bot, err := linebot.New(l.LineService.ChannelSecret, l.LineService.ChannelToken)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"method": "POST",
@@ -41,6 +49,8 @@ func (ls LineService) Receive(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Something went wrong", http.StatusInternalServerError)
 	}
 
+	var user User
+
 	for _, event := range events {
 		if event.Type == linebot.EventTypeMessage {
 			switch message := event.Message.(type) {
@@ -51,17 +61,19 @@ func (ls LineService) Receive(w http.ResponseWriter, r *http.Request) {
 					"event":  "textMessage",
 				}).Info(message.Text)
 
+				user.LineID = event.Source.UserID
+
 				var replyMessage string
 				switch {
-				case message.Text == "@whoami":
+				case message.Text == ":whoami":
 					eventSource := event.Source
 					log.Info(fmt.Sprintf("%+v", *eventSource))
-					bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(fmt.Sprintf("User id: %s", eventSource.UserID))).Do()
+					bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(fmt.Sprintf("User id: %s", user.LineID))).Do()
 					return
-				case strings.HasPrefix(message.Text, "@register"):
-					token := strings.TrimSpace(strings.ReplaceAll(message.Text, "@register", ""))
+				case strings.HasPrefix(message.Text, ":register"):
+					token := strings.TrimSpace(strings.ReplaceAll(message.Text, ":register", ""))
 					if token == "" {
-						register, err := ls.RegisterService.TokenCreate(event.Source.UserID)
+						register, err := l.RegisterService.TokenCreate(user.LineID)
 						if err != nil {
 							log.WithFields(log.Fields{
 								"method": "POST",
@@ -76,7 +88,7 @@ func (ls LineService) Receive(w http.ResponseWriter, r *http.Request) {
 						}).Info("Token created")
 						replyMessage = "Please obtain and send generated token"
 					} else {
-						err := ls.RegisterService.Register(event.Source.UserID, token)
+						err := l.RegisterService.Register(event.Source.UserID, token)
 						if err != nil {
 							log.WithFields(log.Fields{
 								"method": "POST",
@@ -90,9 +102,27 @@ func (ls LineService) Receive(w http.ResponseWriter, r *http.Request) {
 					}
 					bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do()
 					return
-				case strings.HasPrefix(message.Text, "@act"):
-					prompt := strings.ReplaceAll(message.Text, "@act", "")
-					replyMessage, err := ls.ActivityService.Prompt(prompt, ls.Gpt.ApiKey)
+				case strings.HasPrefix(message.Text, ":act"):
+					prompt := strings.ReplaceAll(message.Text, ":act", "")
+					// TODO: Check if user is registered
+					id, err := l.checkIdentity(user.LineID, "user")
+					if err != nil {
+						replyMessage := "使用者尚未註冊"
+						bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do()
+						return
+					}
+					user.ID = id
+					err = l.ActivityService.Prompt(prompt, l.Gpt.ApiKey)
+					if err != nil {
+						log.WithFields(log.Fields{
+							"method": "POST",
+							"path":   "/line/message",
+							"event":  "textMessage",
+						}).Error(err)
+						return
+					}
+
+					replyMessage, err := l.ActivityService.Create(user.ID)
 					if err != nil {
 						log.WithFields(log.Fields{
 							"method": "POST",
@@ -107,4 +137,22 @@ func (ls LineService) Receive(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+func (l Line) checkIdentity(lineID, source string) (int, error) {
+	var id int
+	switch source {
+	case "group":
+		return 0, errors.New("group check not implemented")
+	case "user":
+		row := l.LineService.DB.QueryRow(`
+				SELECT id FROM users WHERE line_id = $1
+			`, lineID)
+		err := row.Scan(&id)
+		if err != nil {
+			return 0, fmt.Errorf("line check identity: %w", err)
+		}
+	}
+
+	return id, nil
 }

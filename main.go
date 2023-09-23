@@ -18,7 +18,7 @@ import (
 
 type config struct {
 	PSQL    models.PostgresConfig
-	Linebot messages.LineAuth
+	Linebot messages.LineService
 	Gpt     gpt.GptAuth
 }
 
@@ -74,9 +74,13 @@ func main() {
 	defer db.Close()
 
 	// Setup service
-	lineS := messages.LineService{
-		Line: cfg.Linebot,
-		Gpt:  cfg.Gpt,
+	lineS := messages.Line{
+		LineService: &messages.LineService{
+			DB:            db,
+			ChannelSecret: cfg.Linebot.ChannelSecret,
+			ChannelToken:  cfg.Linebot.ChannelToken,
+		},
+		Gpt: cfg.Gpt,
 		ActivityService: &activities.ActivityService{
 			DB: db,
 		},
