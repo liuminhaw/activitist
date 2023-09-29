@@ -122,7 +122,7 @@ func (l Line) Receive(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					replyMessage, err := l.ActivityService.Create(user.ID)
+					replyMessage, err := l.ActivityService.Action(user.ID)
 					if err != nil {
 						log.WithFields(log.Fields{
 							"method": "POST",
