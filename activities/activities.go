@@ -47,6 +47,8 @@ func (service *ActivityService) Action(id int) (string, error) {
 	switch service.Activity.Action {
 	case "create":
 		reply, err = service.create(id)
+	case "list":
+		reply, err = service.list(id)
 	}
 	if err != nil {
 		return "", fmt.Errorf("action: %w", err)
@@ -81,8 +83,41 @@ func (service *ActivityService) create(id int) (string, error) {
 	return b.String(), nil
 }
 
-func (service *ActivityService) list(id int) string {
-	return fmt.Sprintln("列出近期活動")
+func (service *ActivityService) list(id int) (string, error) {
+	var b bytes.Buffer
+
+	rows, err := service.DB.Query(`
+		select activity, starttime 
+		FROM individual_activities 
+		INNER JOIN users 
+		    ON user_id = users.id 
+		    WHERE user_id = $1 AND starttime >= $2 
+		ORDER BY starttime ASC;
+	`, id, time.Now())
+	if err != nil {
+		return "", fmt.Errorf("list activities: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			activity  string
+			startTime time.Time
+		)
+		if err := rows.Scan(&activity, &startTime); err != nil {
+			return "", fmt.Errorf("list activity: %w", err)
+		}
+
+		actStartTime := activityTime(startTime)
+		b.WriteString(fmt.Sprintf("%s\n", activity))
+		b.WriteString(fmt.Sprintf("時間: %s\n", actStartTime.String()))
+		b.WriteString("---\n")
+	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("list activities: %w", err)
+	}
+
+	return b.String(), nil
 }
 
 func (a Activity) update() string {

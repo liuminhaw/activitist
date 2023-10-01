@@ -3,6 +3,7 @@ package gpt
 import (
 	"context"
 	"fmt"
+	"time"
 
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
@@ -17,7 +18,7 @@ const systemRole = `Please response in traditional chinese. You are an professio
 "action" key is always needed. Based on the provided information, please determine whether this is intended for adding an event, updating an event, deleting an event, listing events, or if it's indeterminate. Fill in the action field with "create", "update", "delete", "list", or "undefined" accordingly.
 Provide a distinctive event name for "name" key which is not easily confused with other events in traditional Chinese.
 Provide the event's starting time for "starttime" key.
-Provide the event's ending time for "endttime" key only if there is information in the given prompt, or else ignore this field.
+Provide the event's ending time for "endttime" key only if there is information about activity ending time in the given prompt, or this field  should be ignored.
 Provide the related location for "location" key.
 Except for "action" key, the other fields should not be included if there is no available information to determine their content.
 For example, if the message is "Add location to the Thin Eatery event: Thin Eatery," it should be interpreted as "Modify the location of the Thin Eatery event to Thin Eatery."
@@ -27,6 +28,8 @@ Deleting an event: {"action": "delete","name": "Weekend Market"}
 Updating an event: {"action": "update","name": "Health Seminar","starttime": "2023-09-20 14:00:00","endtime": "2023-09-20 16:00:00","location": "Health Center"}
 Listing events: {"action": "list"}
 Indeterminate situation: {"action": "undefined"}`
+
+const defaultTimeFormat = "2006-01-02 15:04:05"
 
 var schema openai.FunctionDefinition = openai.FunctionDefinition{
 	Name: "get_action",
@@ -77,6 +80,10 @@ func AnalyzeMessage(message string, key string) (string, error) {
 					Content: systemRole,
 				},
 				{
+					Role:    openai.ChatMessageRoleAssistant,
+					Content: fmt.Sprintf("Current time is %s", currentTime(defaultTimeFormat)),
+				},
+				{
 					Role:    openai.ChatMessageRoleUser,
 					Content: message,
 				},
@@ -90,4 +97,10 @@ func AnalyzeMessage(message string, key string) (string, error) {
 	}
 	return resp.Choices[0].Message.FunctionCall.Arguments, nil
 	// return resp.Choices[0].Message.Content, nil
+}
+
+func currentTime(format string) string {
+	current := time.Now()
+
+	return current.Format(format)
 }

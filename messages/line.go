@@ -63,6 +63,9 @@ func (l Line) Receive(w http.ResponseWriter, r *http.Request) {
 
 				user.LineID = event.Source.UserID
 
+				// tStamp := event.Timestamp
+				// fmt.Printf("TimeStamp: %v, Location: %s\n", tStamp, tStamp.String())
+
 				var replyMessage string
 				switch {
 				case message.Text == ":whoami":
